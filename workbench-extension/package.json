@@ -1,0 +1,16 @@
+{
+  "name": "codex-web-layout",
+  "publisher": "codex-web-community",
+  "description": "Open the official Codex panel in a self-hosted web workbench",
+  "license": "MIT",
+  "files": ["extension.cjs", "LICENSE", "README.md"],
+  "displayName": "Codex Web Layout",
+  "version": "1.0.0",
+  "engines": { "vscode": "^1.96.2" },
+  "main": "./extension.cjs",
+  "activationEvents": ["onStartupFinished"],
+  "extensionDependencies": ["openai.chatgpt"],
+  "contributes": {
+    "commands": [{ "command": "codexWeb.focus", "title": "Codex: 显示完整面板" }]
+  }
+}

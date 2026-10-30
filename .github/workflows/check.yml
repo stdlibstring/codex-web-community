@@ -1,0 +1,20 @@
+name: Check
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: mkdir -p .artifacts/runtime .artifacts/project
+      - run: echo "TMPDIR=$GITHUB_WORKSPACE/.artifacts/runtime" >> "$GITHUB_ENV"
+      - run: npm ci
+      - run: npm install --prefix .artifacts/codex-cli @openai/codex
+      - run: npm run setup -- --project "$PWD/.artifacts/project" --codex "$PWD/.artifacts/codex-cli/node_modules/.bin/codex" --accept-server-license-terms
+      - run: npm run build
+      - run: npm test
+      - run: npm run pack:source
