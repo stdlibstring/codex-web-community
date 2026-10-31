@@ -3,6 +3,7 @@ package dev.stdlibstring.codexremote;
 import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.content.res.ColorStateList;
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -35,6 +36,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.activity.OnBackPressedCallback;
+import androidx.activity.EdgeToEdge;
+import androidx.activity.SystemBarStyle;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.core.graphics.Insets;
@@ -93,7 +96,8 @@ public final class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle state) {
-        darkMode = getPreferences(MODE_PRIVATE).getString("appearance", "dark").equals("dark");
+        boolean pageDark = getPreferences(MODE_PRIVATE).getString("appearance", "dark").equals("dark");
+        darkMode = useDarkAppearance(pageDark);
         setTheme(darkMode ? R.style.Theme_CodexRemote : R.style.Theme_CodexRemote_Light);
         super.onCreate(state);
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
@@ -152,7 +156,7 @@ public final class MainActivity extends AppCompatActivity {
         createErrorPanel(content);
         content.addView(progress, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(2), Gravity.TOP));
         configureWebView();
-        applyAppearance(darkMode);
+        applyAppearance(pageDark);
 
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
@@ -326,7 +330,13 @@ public final class MainActivity extends AppCompatActivity {
         return true;
     }
 
-    private void applyAppearance(boolean dark) {
+    private boolean useDarkAppearance(boolean pageDark) {
+        return pageDark || (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
+                == Configuration.UI_MODE_NIGHT_YES;
+    }
+
+    private void applyAppearance(boolean pageDark) {
+        boolean dark = useDarkAppearance(pageDark);
         darkMode = dark;
         getTheme().applyStyle(dark ? R.style.Theme_CodexRemote : R.style.Theme_CodexRemote_Light, true);
         surface = getColor(dark ? R.color.surface_dark : R.color.surface_light);
@@ -350,11 +360,11 @@ public final class MainActivity extends AppCompatActivity {
         errorPanel.setBackgroundColor(surface);
         retryButton.setBackgroundTintList(ColorStateList.valueOf(foreground));
         retryButton.setTextColor(surface);
-        var controller = WindowCompat.getInsetsController(getWindow(), root);
-        controller.setAppearanceLightStatusBars(!dark);
-        controller.setAppearanceLightNavigationBars(!dark);
+        SystemBarStyle bars = dark ? SystemBarStyle.dark(Color.TRANSPARENT)
+                : SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT);
+        EdgeToEdge.enable(this, bars, bars);
         tintMenu();
-        getPreferences(MODE_PRIVATE).edit().putString("appearance", dark ? "dark" : "light").apply();
+        getPreferences(MODE_PRIVATE).edit().putString("appearance", pageDark ? "dark" : "light").apply();
     }
 
     private GradientDrawable rounded(int color, int radius) {

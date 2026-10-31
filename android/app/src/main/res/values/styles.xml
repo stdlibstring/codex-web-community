@@ -9,6 +9,8 @@
         <item name="android:windowBackground">@color/surface_dark</item>
         <item name="android:windowActionModeOverlay">true</item>
         <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="bottomSheetDialogTheme">@style/ThemeOverlay.CodexRemote.BottomSheet</item>
     </style>
     <style name="Theme.CodexRemote.Light" parent="Theme.Material3.Light.NoActionBar">
@@ -20,6 +22,8 @@
         <item name="android:windowBackground">@color/surface_light</item>
         <item name="android:windowActionModeOverlay">true</item>
         <item name="android:windowLightStatusBar">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="bottomSheetDialogTheme">@style/ThemeOverlay.CodexRemote.BottomSheet</item>
     </style>
     <style name="ThemeOverlay.CodexRemote.BottomSheet" parent="ThemeOverlay.Material3.BottomSheetDialog">
