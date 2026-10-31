@@ -20,7 +20,8 @@
     "test": "node scripts/test.mjs",
     "test:browser": "node scripts/browser-check.mjs",
     "test:agent": "node scripts/agent-check.mjs",
-    "pack:source": "node scripts/pack.mjs"
+    "pack:source": "node scripts/pack.mjs",
+    "android:build": "node scripts/android-build.mjs"
   },
   "dependencies": {
     "@fastify/helmet": "^13.0.0",

@@ -1,0 +1,135 @@
+import groovy.json.JsonOutput
+import groovy.xml.MarkupBuilder
+import java.security.cert.CertificateFactory
+
+plugins {
+    id 'com.android.application'
+}
+
+def requestedUrl = providers.gradleProperty('codexServerUrl').orNull
+if (!requestedUrl) throw new GradleException('请通过 -PcodexServerUrl=https://你的服务器地址 指定 HTTPS 入口。')
+def server = new URI(requestedUrl)
+if (!'https'.equalsIgnoreCase(server.scheme) || !server.host || server.rawUserInfo || server.rawQuery || server.rawFragment
+        || !(server.path in ['', '/']) || server.port < -1 || server.port == 0 || server.port > 65535) {
+    throw new GradleException('codexServerUrl 必须是没有用户名、密码、路径或查询参数的 HTTPS 入口。')
+}
+def serverHost = server.host.toLowerCase(Locale.ROOT)
+def serverUrl = new URI('https', null, serverHost, server.port == 443 ? -1 : server.port, '/', null, null).toASCIIString()
+def caPath = providers.gradleProperty('codexServerCa').orNull
+def caFile = caPath ? rootProject.file(caPath) : null
+if (caFile != null && !caFile.isFile()) throw new GradleException('codexServerCa 指定的公开证书文件不存在。')
+def signingPath = providers.gradleProperty('codexSigningProperties').orNull
+def signing = new Properties()
+if (signingPath) {
+    rootProject.file(signingPath).withInputStream { signing.load(it) }
+    for (key in ['storeFile', 'storePassword', 'keyAlias', 'keyPassword']) {
+        if (!signing.getProperty(key)) throw new GradleException("签名配置缺少 ${key}。")
+    }
+    if (!rootProject.file(signing.getProperty('storeFile')).isFile()) {
+        throw new GradleException('签名文件不存在。')
+    }
+}
+
+android {
+    namespace 'dev.stdlibstring.codexremote'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'dev.stdlibstring.codexremote.community'
+        minSdk 26
+        targetSdk 36
+        versionCode 4
+        versionName '1.1.2'
+        buildConfigField 'String', 'SERVER_URL', JsonOutput.toJson(serverUrl)
+    }
+
+    signingConfigs {
+        if (signingPath) {
+            create('release') {
+                storeFile rootProject.file(signing.getProperty('storeFile'))
+                storePassword signing.getProperty('storePassword')
+                keyAlias signing.getProperty('keyAlias')
+                keyPassword signing.getProperty('keyPassword')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            if (signingPath) signingConfig signingConfigs.getByName('release')
+        }
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+def resources = layout.buildDirectory.dir('generated/res/network')
+def prepareNetwork = tasks.register('prepareNetworkSecurity') {
+    inputs.property('serverUrl', serverUrl)
+    if (caFile != null) inputs.file(caFile)
+    outputs.dir(resources)
+    doLast {
+        def output = resources.get().asFile
+        delete output
+        def configuration = new File(output, 'xml/network_security_config.xml')
+        configuration.parentFile.mkdirs()
+        def text = new StringWriter()
+        def xml = new MarkupBuilder(text)
+        xml.mkp.xmlDeclaration(version: '1.0', encoding: 'utf-8')
+        xml.'network-security-config' {
+            'base-config'(cleartextTrafficPermitted: 'false') {
+                'trust-anchors' { certificates(src: 'system') }
+            }
+            if (caFile != null) {
+                'domain-config'(cleartextTrafficPermitted: 'false') {
+                    domain(includeSubdomains: 'false', serverHost)
+                    'trust-anchors' {
+                        certificates(src: 'system')
+                        certificates(src: '@raw/server_ca')
+                    }
+                }
+            }
+        }
+        configuration.setText(text.toString(), 'UTF-8')
+        if (caFile != null) {
+            if (caFile.getText('ISO-8859-1').contains('PRIVATE KEY')) {
+                throw new GradleException('codexServerCa 只能包含公开证书。')
+            }
+            caFile.withInputStream { stream ->
+                if (CertificateFactory.getInstance('X.509').generateCertificates(stream).isEmpty()) {
+                    throw new GradleException('codexServerCa 需要有效的 X.509 证书。')
+                }
+            }
+            copy {
+                from caFile
+                into new File(output, 'raw')
+                rename { 'server_ca.pem' }
+            }
+        }
+    }
+}
+android.sourceSets.main.res.srcDir(resources)
+tasks.named('preBuild').configure { dependsOn prepareNetwork }
+def requireSigning = tasks.register('requireReleaseSigning') {
+    doLast {
+        if (!signingPath) throw new GradleException('正式构建需要通过 -PcodexSigningProperties 指定自己的签名配置。')
+    }
+}
+tasks.configureEach {
+    if (name == 'preReleaseBuild') dependsOn requireSigning
+}
+
+dependencies {
+    implementation 'androidx.activity:activity:1.10.1'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'androidx.core:core:1.16.0'
+    implementation 'androidx.webkit:webkit:1.14.0'
+    implementation 'com.google.android.material:material:1.13.0'
+}

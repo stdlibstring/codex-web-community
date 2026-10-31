@@ -105,6 +105,18 @@ systemctl --user stop codex-web-community
 
 更换证书后，执行 `systemctl --user reload codex-web-community` 加载证书。服务配置使用独立名称。日志、下载内容及安装结果均位于 `.artifacts/`。
 
+## Android APP
+
+`android/` 提供版本 `1.1.2` 的 Codex 远程 APP 源码，包含明暗主题、原生菜单、系统文件选择、软键盘布局和 WebView 全屏支持。服务器地址、公开证书和签名通过构建参数配置。应用 ID 为 `dev.stdlibstring.codexremote.community`，支持 Android 8.0 及以上版本。
+
+准备 JDK 21 与 Android SDK 36 后，在仓库根目录构建自己的安装包：
+
+```bash
+npm run android:build -- assembleDebug lintDebug -PcodexServerUrl=https://codex.example.com:8443/ -PcodexServerCa="$PWD/.artifacts/tls.crt"
+```
+
+安装包位于 `android/app/build/outputs/apk/debug/app-debug.apk`。使用系统已信任证书时省略 `codexServerCa`。正式签名、构建环境与参数说明见 [Android APP](android/README.md)。
+
 ## 验证
 
 ```bash
@@ -139,7 +151,7 @@ npm run pack:source
 
 源码包生成在 `.artifacts/output/codex-web-community-1.0.0.tar.gz`。打包脚本按明确列出的源码目录收集文件；运行数据、个人配置、账户凭据、证书、官方二进制组件、依赖和构建产物均位于打包范围之外。接收者解压后按照安装流程运行。
 
-仓库的 GitHub Actions 工作流在 Linux 上安装固定版本组件，执行构建和真实集成测试。
+仓库的 GitHub Actions 工作流在 Linux 上安装固定版本组件，执行网站构建和真实集成测试，并单独执行 Android 调试构建与 lint。
 
 ## 使用范围
 

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Codex 远程</string>
+    <string name="toolbar_title">Codex</string>
+    <string name="menu_title">工作台</string>
+    <string name="close_menu">关闭菜单</string>
+    <string name="account_detail">登录与访问设置</string>
+    <string name="browser_detail">在系统浏览器中继续访问</string>
+    <string name="refresh">刷新页面</string>
+    <string name="more">更多操作</string>
+    <string name="account">账户管理</string>
+    <string name="browser">在浏览器中打开</string>
+    <string name="retry">重新连接</string>
+    <string name="network_error">无法连接服务器</string>
+    <string name="network_error_detail">请确认手机能够访问配置的服务器，再点击重新连接。</string>
+    <string name="certificate_error">服务器证书验证失败</string>
+    <string name="certificate_error_detail">当前连接已停止。请检查服务器证书与 APP 中的证书配置。</string>
+    <string name="http_error">服务器返回 HTTP %1$d</string>
+    <string name="unsupported_link">无法打开这个链接。</string>
+    <string name="webview_update">需要更新 Android System WebView</string>
+    <string name="webview_update_detail">当前 WebView 不支持 Codex 界面需要的页面定位功能。请通过手机应用商店或系统更新，更新 Android System WebView 后重新连接。</string>
+</resources>

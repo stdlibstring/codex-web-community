@@ -4,13 +4,18 @@ import { resolve } from 'node:path';
 import { root, state } from '../shared/config.mjs';
 
 const files = [
-  '.gitignore', '.npmrc', '.github', 'LICENSE', 'README.md', 'PLAN.md', 'VERIFICATION.md',
+  '.gitignore', '.gitattributes', '.npmrc', '.github', 'LICENSE', 'README.md', 'PLAN.md', 'VERIFICATION.md',
   'package.json', 'package-lock.json', 'portal.html', 'tsconfig.json',
   'tsconfig.server.json', 'vite.portal.config.ts', 'public', 'src', 'server',
-  'shared', 'scripts', 'tests', 'workbench-extension',
+  'shared', 'scripts', 'tests', 'workbench-extension', 'android',
 ];
 const output = resolve(state, 'output');
 await mkdir(output, { recursive: true, mode: 0o700 });
 const archive = resolve(output, 'codex-web-community-1.0.0.tar.gz');
-execFileSync('tar', ['--create', '--gzip', '--file', archive, '--', ...files], { cwd: root, stdio: 'inherit' });
+execFileSync('tar', ['--create', '--gzip', '--file', archive,
+  '--exclude=.gradle', '--exclude=build', '--exclude=local.properties',
+  '--exclude=keystore.properties', '--exclude=signing.properties',
+  '--exclude=*.pem', '--exclude=*.key', '--exclude=*.crt', '--exclude=*.cer', '--exclude=*.der',
+  '--exclude=*.jks', '--exclude=*.p12', '--exclude=*.keystore',
+  '--', ...files], { cwd: root, stdio: 'inherit' });
 console.log(archive);

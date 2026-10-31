@@ -8,3 +8,11 @@ config.json
 *.vsix
 *.pem
 *.key
+*.crt
+*.cer
+*.der
+*.jks
+*.p12
+*.keystore
+keystore.properties
+signing.properties

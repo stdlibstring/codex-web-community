@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="codex_root" type="id" />
+    <item name="codex_webview" type="id" />
+    <item name="codex_fullscreen" type="id" />
+    <item name="codex_error" type="id" />
+    <item name="codex_refresh" type="id" />
+    <item name="codex_more" type="id" />
+    <item name="codex_toolbar" type="id" />
+    <item name="codex_menu" type="id" />
+    <item name="codex_menu_close" type="id" />
+    <item name="codex_account" type="id" />
+    <item name="codex_browser" type="id" />
+    <item name="codex_retry" type="id" />
+</resources>

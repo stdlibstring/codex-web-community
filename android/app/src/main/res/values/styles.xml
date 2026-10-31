@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.CodexRemote" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="colorPrimary">@color/text_dark</item>
+        <item name="colorOnPrimary">@color/surface_dark</item>
+        <item name="colorSurface">@color/surface_dark</item>
+        <item name="colorOnSurface">@color/text_dark</item>
+        <item name="android:windowBackground">@color/surface_dark</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="bottomSheetDialogTheme">@style/ThemeOverlay.CodexRemote.BottomSheet</item>
+    </style>
+    <style name="Theme.CodexRemote.Light" parent="Theme.Material3.Light.NoActionBar">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="colorPrimary">@color/text_light</item>
+        <item name="colorOnPrimary">@color/surface_light</item>
+        <item name="colorSurface">@color/surface_light</item>
+        <item name="colorOnSurface">@color/text_light</item>
+        <item name="android:windowBackground">@color/surface_light</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="bottomSheetDialogTheme">@style/ThemeOverlay.CodexRemote.BottomSheet</item>
+    </style>
+    <style name="ThemeOverlay.CodexRemote.BottomSheet" parent="ThemeOverlay.Material3.BottomSheetDialog">
+        <item name="bottomSheetStyle">@style/Widget.CodexRemote.BottomSheet</item>
+    </style>
+    <style name="Widget.CodexRemote.BottomSheet" parent="Widget.Material3.BottomSheet.Modal">
+        <item name="shapeAppearance">@style/ShapeAppearance.CodexRemote.BottomSheet</item>
+    </style>
+    <style name="ShapeAppearance.CodexRemote.BottomSheet" parent="ShapeAppearance.Material3.Corner.ExtraLarge">
+        <item name="cornerSizeTopLeft">28dp</item>
+        <item name="cornerSizeTopRight">28dp</item>
+        <item name="cornerSizeBottomLeft">0dp</item>
+        <item name="cornerSizeBottomRight">0dp</item>
+    </style>
+</resources>
