@@ -10,6 +10,11 @@
     <item name="codex_menu" type="id" />
     <item name="codex_menu_close" type="id" />
     <item name="codex_account" type="id" />
+    <item name="codex_appearance" type="id" />
+    <item name="codex_follow_system" type="id" />
     <item name="codex_browser" type="id" />
     <item name="codex_retry" type="id" />
+    <item name="codex_notifications" type="id" />
+    <item name="codex_notification_switch" type="id" />
+    <item name="codex_notification_settings" type="id" />
 </resources>

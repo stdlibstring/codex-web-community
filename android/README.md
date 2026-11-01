@@ -1,8 +1,8 @@
 # Codex 远程 Android APP
 
-版本 `1.1.3`，支持 Android 8.0 及以上版本，需要较新的 Android System WebView。APP 使用 WebView 连接自己部署的 Codex Web Community，显示官方 Codex 插件；登录状态保存在 APP 私有数据目录。
+版本 `1.7.2`，支持 Android 8.0 及以上版本，需要较新的 Android System WebView。APP 使用 WebView 连接自己部署的 Codex Web Community；登录状态保存在 APP 私有数据目录。支持附件选择、录音权限、原生通行密钥、系统返回、任务通知和通知直接回复。
 
-原生界面采用黑白配色、白色双环图标、56dp 顶部栏和圆角底部菜单。顶部栏提供刷新与更多操作，菜单可以进入账户管理或打开系统浏览器。手机开启深色模式时，原生界面与系统栏使用深色背景和浅色图标；手机使用浅色模式时，原生界面跟随工作台主题。APP 保存网页的主题选择，并在启动和手机主题变化时重新计算原生外观。系统栏使用 AndroidX EdgeToEdge 配置透明背景，显示下方的原生界面颜色。
+原生界面采用黑白配色、56dp 顶部栏和圆角底部菜单。顶部栏提供重新加载与更多操作，菜单可以进入账户设置、管理通知、切换跟随系统或打开系统浏览器。APP 与网页共享主题选择，并在启动和手机主题变化时同步外观。系统栏使用 AndroidX EdgeToEdge 配置透明背景，显示下方的原生界面颜色。
 
 WebView 进入全屏时隐藏原生顶部栏和系统栏，网页退出与系统返回操作可以恢复普通窗口。键盘打开时优先收起键盘。普通模式与全屏模式均按键盘、系统栏和屏幕开孔调整布局；横屏允许输入法提供系统编辑区域。文件附件使用 Android 系统选择器。
 
@@ -31,6 +31,10 @@ npm run android:build -- assembleDebug lintDebug -PcodexServerUrl=https://codex.
 `codexServerCa` 接受 X.509 公开证书，证书中的名称需要覆盖配置的主机。构建程序为该主机生成独立的网络安全配置，公开证书写入安装包。其他主机使用系统证书。TLS 验证失败会停止连接，手机无需安装系统 CA。
 
 调试安装包位于 `android/app/build/outputs/apk/debug/app-debug.apk`，应用 ID 为 `dev.stdlibstring.codexremote.community`。调试签名材料在构建者本地生成。
+
+使用通行密钥时，增加 `-PcodexPasskeyRpId=codex.example.com`，并在服务器配置相同域名和本次构建的签名证书指纹。应用会生成对应域名的 Digital Asset Links 声明。网站的 `/.well-known/assetlinks.json` 需要通过该域名的 HTTPS 默认端口访问，使用公开受信任的证书。服务器配置方式见根目录 README。
+
+任务通知使用 Android 前台服务，启用后显示持续的消息接收通知。Android 13 及以上版本需要授予通知权限。网络重连、登录过期和答案发送结果均在通知中显示。可以在更多菜单中关闭任务通知，或在系统通知设置中调整提醒方式。
 
 ## 正式签名
 

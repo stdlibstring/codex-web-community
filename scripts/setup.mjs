@@ -6,6 +6,7 @@ import { isIP } from 'node:net';
 import { resolve, dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { configSchema, root, state, configFile, childEnvironment } from '../shared/config.mjs';
+import { installWorkbench } from './workbench-install.mjs';
 
 const { values } = parseArgs({ options: {
   project: { type: 'string' }, codex: { type: 'string' }, server: { type: 'string' },
@@ -14,6 +15,8 @@ const { values } = parseArgs({ options: {
   'workbench-port': { type: 'string', default: '8444' },
   'engine-port': { type: 'string', default: '8446' },
   'tls-cert': { type: 'string' }, 'tls-key': { type: 'string' },
+  claude: { type: 'boolean', default: false }, copilot: { type: 'boolean', default: false },
+  qoder: { type: 'boolean', default: false },
   'accept-server-license-terms': { type: 'boolean', default: false },
 } });
 if (!values['accept-server-license-terms']) {
@@ -60,7 +63,7 @@ async function createPrivate(name, content) {
     await writeFile(join(state, name), content, { flag: 'wx', mode: 0o600 });
   }
 }
-if (!privateFiles.has('auth.json')) {
+if (!privateFiles.has('account.sqlite') && !privateFiles.has('auth.json')) {
   if (privateFiles.has('access.json')) throw new Error('access.json 已存在且 auth.json 缺失，请检查运行目录。');
   const password = randomBytes(24).toString('base64url');
   const salt = randomBytes(32).toString('hex');
@@ -68,6 +71,7 @@ if (!privateFiles.has('auth.json')) {
   await createPrivate('access.json', JSON.stringify({ password }));
 }
 await createPrivate('session.key', randomBytes(32));
+await createPrivate('workbench-secret.key', randomBytes(32));
 await createPrivate('engine.token', randomBytes(32).toString('base64url'));
 await createPrivate('workbench.token', randomBytes(32).toString('base64url'));
 if (!values['tls-cert']) {
@@ -104,7 +108,13 @@ const settingsPath = join(data, 'Machine', 'settings.json');
 const existingSettings = (await readdir(dirname(settingsPath))).includes('settings.json');
 if (!existingSettings) await writeFile(settingsPath, JSON.stringify({
   'chatgpt.cliExecutable': join(root, 'scripts', 'codex-client.sh'),
-  'chatgpt.openOnStartup': true,
+  'chatgpt.openOnStartup': false,
+  'workbench.colorTheme': 'Dark Modern',
+  'workbench.layoutControl.enabled': true,
+  'workbench.layoutControl.type': 'toggles',
+  'workbench.secondarySideBar.showLabels': true,
+  'workbench.secondarySideBar.defaultVisibility': 'hidden',
+  'chat.disableAIFeatures': false,
   'workbench.startupEditor': 'none',
   'workbench.activityBar.location': 'hidden',
   'workbench.statusBar.visible': false,
@@ -118,6 +128,14 @@ const installed = execFileSync(config.server, [...extensionArgs, '--list-extensi
 if (!installed.split(/\r?\n/).includes('openai.chatgpt@26.51007.21434')) {
   execFileSync(config.server, [...extensionArgs, '--install-extension', 'openai.chatgpt@26.51007.21434'], { env, stdio: 'inherit' });
 }
+for (const [enabled, extension] of [
+  [values.claude, 'anthropic.claude-code@2.1.314'],
+  [values.copilot, 'github.copilot-chat'],
+  [values.qoder, 'alibaba-cloud.tongyi-lingma@2.6.10'],
+]) {
+  if (enabled) execFileSync(config.server, [...extensionArgs, '--install-extension', extension], { env, stdio: 'inherit' });
+}
+await installWorkbench(config, extensions);
 const layout = join(state, 'runtime', 'codex-web-layout.vsix');
 execFileSync(process.execPath, [join(root, 'node_modules', '@vscode', 'vsce', 'vsce'),
   'package', '--no-dependencies', '--allow-missing-repository', '--out', layout], {

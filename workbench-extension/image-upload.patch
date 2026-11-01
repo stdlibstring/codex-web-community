@@ -1,0 +1,6 @@
+--- a/webview/assets/app-initial-fee819fe4f22.js
++++ b/webview/assets/app-initial-fee819fe4f22.js
+@@ -394,1 +394,3 @@
++import { installBrowserImageUpload } from './codex-web-images.js?v=2';
++({ createAttachments: jSa, createMenu: MNa } = installBrowserImageUpload({ createAttachments: jSa, createMenu: MNa, pickFiles: dSa }));
+ //# sourceMappingURL=app-initial-fee819fe4f22.js.map

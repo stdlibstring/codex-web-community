@@ -1,0 +1,23 @@
+--- a/webview/assets/app-initial-fee819fe4f22.js
++++ b/webview/assets/app-initial-fee819fe4f22.js
+@@ -394,1 +394,14 @@
++import { installBrowserCapture } from './codex-web-microphone.js?v=1';
++const initializeMicrophoneSession = GSr;
++GSr = () => { initializeMicrophoneSession(); installBrowserCapture(WSr); };
++const createVoiceRecorder = T6i;
++T6i = options => createVoiceRecorder({ ...options, streamingEnabled: false });
++_Wt();
++gWt.dictation = ou($, ({ get }) => {
++  const loading = get(Op, '4100906017');
++  const enabled = get(sg, '4100906017');
++  const { authLoading, authMethod } = get(US);
++  const isLoading = authLoading || loading;
++  return { isLoading, isError: false, isCapable: !isLoading && enabled && authMethod === 'chatgpt' && Boolean(navigator.mediaDevices?.getUserMedia) && typeof MediaRecorder !== 'undefined' };
++});
+ //# sourceMappingURL=app-initial-fee819fe4f22.js.map
+--- a/webview/assets/app-initial-41ab338a184f.js
++++ b/webview/assets/app-initial-41ab338a184f.js
+@@ -1269,1 +1269,3 @@
++import { transcribeBrowserAudio } from './codex-web-microphone.js?v=1';
++sWn = transcribeBrowserAudio;
+ //# sourceMappingURL=app-initial-41ab338a184f.js.map

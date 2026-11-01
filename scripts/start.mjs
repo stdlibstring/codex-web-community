@@ -4,6 +4,7 @@ import { createServer, connect } from 'node:net';
 import { once } from 'node:events';
 import { resolve } from 'node:path';
 import { loadConfig, childEnvironment, root, state } from '../shared/config.mjs';
+import killTree from 'tree-kill';
 
 const config = await loadConfig();
 const env = childEnvironment(config);
@@ -20,10 +21,10 @@ let stopping = false;
 function stop(code) {
   if (stopping) return;
   stopping = true;
-  for (const child of children) child.kill('SIGTERM');
+  for (const child of children) killTree(child.pid, 'SIGTERM', error => { if (error) throw error; });
   if (!children.size) process.exit(code);
   const timer = setTimeout(() => {
-    for (const child of children) child.kill('SIGKILL');
+    for (const child of children) killTree(child.pid, 'SIGKILL', error => { if (error) throw error; });
   }, 10_000);
   timer.unref();
   process.exitCode = code;

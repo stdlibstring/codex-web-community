@@ -15,6 +15,9 @@ await withDeployment(async (config) => {
   const context = await browser.newContext({ ignoreHTTPSErrors: true });
   const page = await context.newPage();
   const record = { checks: [], completed: false };
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
   page.setDefaultTimeout(30_000);
   try {
     await page.goto(`https://127.0.0.1:${config.port}/`);
@@ -26,17 +29,37 @@ await withDeployment(async (config) => {
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     }
     record.checks.push('手机与电脑宽度的登录表单');
+    for (const theme of ['dark', 'light']) {
+      await page.emulateMedia({ colorScheme: theme });
+      await page.waitForFunction(theme => document.documentElement.dataset.theme === theme, theme);
+    }
+    await page.getByRole('button', { name: '开启黑夜模式', exact: true }).click();
+    await page.reload();
+    await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
+    record.checks.push('系统主题、手动切换与刷新保存');
     await page.getByLabel('访问密码').fill(password);
-    await page.getByRole('button', { name: '连接 Codex', exact: true }).click();
+    await page.getByRole('button', { name: '使用访问密码登录', exact: true }).click();
     await page.waitForURL('**/workbench/');
+    await page.goto(`https://127.0.0.1:${config.port}/account/security`);
+    await page.getByRole('heading', { name: '登录与安全', exact: true }).waitFor();
+    await page.getByRole('button', { name: '修改密码', exact: true }).click();
+    await page.getByRole('dialog', { name: '验证身份', exact: true }).waitFor();
+    await page.getByRole('button', { name: '取消', exact: true }).click();
+    await page.getByRole('button', { name: '配置邮件服务', exact: true }).waitFor();
+    record.checks.push('真实账户设置与身份验证窗口');
+    await page.goto(`https://127.0.0.1:${config.port}/workbench/`);
     await page.locator('.monaco-workbench').waitFor({ timeout: 60_000 });
     record.checks.push('登录后加载真实官方工作台');
-    const manage = page.getByText('Manage', { exact: true });
-    await manage.waitFor();
-    await manage.click();
-    await page.getByRole('button', { name: 'Trust', exact: true }).click();
-    await page.keyboard.press('Escape');
-    await page.locator('.monaco-modal-editor-block').waitFor({ state: 'hidden' });
+    const manage = page.getByRole('banner').getByRole('button', { name: 'Manage', exact: true });
+    const trust = page.getByRole('button', { name: 'Trust Folder & Continue', exact: true });
+    await manage.or(trust).or(page.locator('iframe[src*="extensionId=openai.chatgpt"]')).first().waitFor({ timeout: 60_000 });
+    if (await trust.isVisible()) await trust.click();
+    else if (await manage.isVisible()) {
+      await manage.click();
+      await page.getByRole('button', { name: 'Trust', exact: true }).click();
+      await page.keyboard.press('Escape');
+      await page.locator('.monaco-modal-editor-block').waitFor({ state: 'hidden' });
+    }
     const frame = page.frameLocator('iframe[src*="extensionId=openai.chatgpt"]').frameLocator('iframe#active-frame');
     await frame.getByRole('button').first().waitFor({ timeout: 90_000 });
     const text = await frame.locator('body').innerText();
@@ -68,6 +91,7 @@ await withDeployment(async (config) => {
       url: frame.url(), text: await frame.locator('body').innerText({ timeout: 2000 }),
     })));
     await writeFile(resolve(state, 'browser-dom.json'), JSON.stringify(frames, null, 2), { mode: 0o600 });
+    await writeFile(resolve(state, 'browser-console.json'), JSON.stringify(errors, null, 2), { mode: 0o600 });
     await writeFile(resolve(state, 'browser-verification.json'), JSON.stringify(record, null, 2), { mode: 0o600 });
     await browser.close();
   }

@@ -10,7 +10,24 @@
   "main": "./extension.cjs",
   "activationEvents": ["onStartupFinished"],
   "extensionDependencies": ["openai.chatgpt"],
+  "capabilities": { "untrustedWorkspaces": { "supported": true } },
   "contributes": {
-    "commands": [{ "command": "codexWeb.focus", "title": "Codex: 显示完整面板" }]
+    "configurationDefaults": {
+      "chatgpt.openOnStartup": false,
+      "claudeCode.preferredLocation": "sidebar",
+      "workbench.colorTheme": "Dark Modern",
+      "workbench.layoutControl.enabled": true,
+      "workbench.layoutControl.type": "toggles",
+      "workbench.activityBar.location": "hidden",
+      "workbench.secondarySideBar.showLabels": true,
+      "chat.disableAIFeatures": false,
+      "workbench.secondarySideBar.defaultVisibility": "hidden"
+    },
+    "commands": [
+      { "command": "codexWeb.focus", "title": "Codex: 显示完整面板" },
+      { "command": "codexWeb.focusClaude", "title": "Claude Code: 显示完整面板" },
+      { "command": "codexWeb.focusCopilot", "title": "Copilot: 显示完整面板" },
+      { "command": "codexWeb.focusQoder", "title": "Qoder CN: 显示完整面板" }
+    ]
   }
 }

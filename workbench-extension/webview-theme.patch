@@ -1,0 +1,20 @@
+--- a/webview/index.html
++++ b/webview/index.html
+@@ -42,6 +42,17 @@
+         outline: none;
+       }
+ 
++      body.vscode-dark,
++      body.vscode-light,
++      body.vscode-high-contrast,
++      body.vscode-high-contrast-light {
++        --startup-background: var(--vscode-editor-background);
++        background-color: var(--vscode-editor-background) !important;
++      }
++
++      html[data-codex-window-type="extension"][data-theme="dark"] { color-scheme: dark; }
++      html[data-codex-window-type="extension"][data-theme="light"] { color-scheme: light; }
++
+       #root {
+         width: 100%;
+         height: 100%;

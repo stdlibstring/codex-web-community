@@ -1,0 +1,17 @@
+--- a/extension.js
++++ b/extension.js
+@@ -1165,5 +1165,14 @@
+         </style>
+         <style>
++          html, body {
++            background-color: var(--vscode-sideBar-background);
++          }
++          html:has(body.vscode-dark), html:has(body.vscode-high-contrast) {
++            color-scheme: dark;
++          }
++          html:has(body.vscode-light), html:has(body.vscode-high-contrast-light) {
++            color-scheme: light;
++          }
+           #claude-error {
+             max-height: 30vh;
+             overflow: auto;

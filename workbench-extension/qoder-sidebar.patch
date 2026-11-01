@@ -1,0 +1,6 @@
+--- a/package.json
++++ b/package.json
+@@ -387,2 +387,2 @@
+ 		"viewsContainers": {
+-			"activitybar": [
++			"secondarySidebar": [

@@ -10,5 +10,5 @@
     <color name="secondary_light">#676767</color>
     <color name="muted_dark">#303030</color>
     <color name="muted_light">#F4F4F4</color>
-    <color name="icon_background">#0D0D0D</color>
+    <color name="icon_background">#000000</color>
 </resources>

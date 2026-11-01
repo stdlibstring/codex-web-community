@@ -7,13 +7,13 @@ const files = [
   '.gitignore', '.gitattributes', '.npmrc', '.github', 'LICENSE', 'README.md', 'PLAN.md', 'VERIFICATION.md',
   'package.json', 'package-lock.json', 'portal.html', 'tsconfig.json',
   'tsconfig.server.json', 'vite.portal.config.ts', 'public', 'src', 'server',
-  'shared', 'scripts', 'tests', 'workbench-extension', 'android',
+  'shared', 'scripts', 'tests', 'workbench-extension', 'android', 'voice',
 ];
 const output = resolve(state, 'output');
 await mkdir(output, { recursive: true, mode: 0o700 });
 const archive = resolve(output, 'codex-web-community-1.0.0.tar.gz');
 execFileSync('tar', ['--create', '--gzip', '--file', archive,
-  '--exclude=.gradle', '--exclude=build', '--exclude=local.properties',
+  '--exclude=.gradle', '--exclude=build', '--exclude=local.properties', '--exclude=__pycache__',
   '--exclude=keystore.properties', '--exclude=signing.properties',
   '--exclude=*.pem', '--exclude=*.key', '--exclude=*.crt', '--exclude=*.cer', '--exclude=*.der',
   '--exclude=*.jks', '--exclude=*.p12', '--exclude=*.keystore',

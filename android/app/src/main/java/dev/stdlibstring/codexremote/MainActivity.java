@@ -1,7 +1,10 @@
 package dev.stdlibstring.codexremote;
 
 import android.annotation.SuppressLint;
+import android.Manifest;
+import android.app.NotificationManager;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.content.res.Configuration;
 import android.graphics.Color;
@@ -11,14 +14,18 @@ import android.graphics.drawable.RippleDrawable;
 import android.net.Uri;
 import android.net.http.SslError;
 import android.os.Bundle;
+import android.os.Build;
+import android.provider.Settings;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.view.Window;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import android.webkit.CookieManager;
+import android.webkit.PermissionRequest;
 import android.webkit.SslErrorHandler;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -41,6 +48,7 @@ import androidx.activity.SystemBarStyle;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.core.graphics.Insets;
+import androidx.core.content.ContextCompat;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -48,10 +56,18 @@ import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.core.widget.NestedScrollView;
 import androidx.webkit.WebViewCompat;
 import androidx.webkit.WebViewFeature;
+import androidx.webkit.ScriptHandler;
+import androidx.webkit.JavaScriptReplyProxy;
+import androidx.appcompat.app.AlertDialog;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.materialswitch.MaterialSwitch;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.progressindicator.LinearProgressIndicator;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.google.gson.JsonPrimitive;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -64,7 +80,6 @@ public final class MainActivity extends AppCompatActivity {
     private WebChromeClient.CustomViewCallback fullscreenCallback;
     private LinearLayout root;
     private TextView toolbarTitle;
-    private ImageButton refreshButton;
     private ImageButton moreButton;
     private NestedScrollView errorPanel;
     private ImageView errorIcon;
@@ -78,6 +93,19 @@ public final class MainActivity extends AppCompatActivity {
     private final List<TextView> menuDetails = new ArrayList<>();
     private final List<ImageView> menuIcons = new ArrayList<>();
     private boolean darkMode;
+    private String appearanceMode;
+    private String appearanceSource;
+    private ScriptHandler appearanceScript;
+    private boolean appearanceReady;
+    private AlertDialog appearanceDialog;
+    private String requestedAppearance;
+    private MaterialSwitch followSystemSwitch;
+    private MaterialSwitch notificationSwitch;
+    private boolean updatingNotificationSwitch;
+    private String notificationThreadId;
+    private String notificationCwd;
+    private String notificationWorkspace;
+    private String notificationRequest;
     private int surface;
     private int sheetSurface;
     private int foreground;
@@ -86,20 +114,46 @@ public final class MainActivity extends AppCompatActivity {
     private ValueCallback<Uri[]> upload;
     private String currentUrl = BuildConfig.SERVER_URL;
     private boolean loadFailed;
+    private JavaScriptReplyProxy navigationReply;
+    private String navigationId;
+    private boolean navigationCanGoBack;
+    private boolean navigationPending;
+    private Uri navigationOrigin;
+    private PermissionRequest microphoneRequest;
+    private PasskeyBridge passkeyBridge;
+
+    private final ActivityResultLauncher<String> microphonePermission = registerForActivityResult(
+            new ActivityResultContracts.RequestPermission(), granted -> {
+                PermissionRequest request = microphoneRequest;
+                microphoneRequest = null;
+                if (request == null) return;
+                if (granted && microphoneOriginAllowed(request.getOrigin())) {
+                    request.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
+                } else request.deny();
+            });
+
+    private final ActivityResultLauncher<String> notificationPermission = registerForActivityResult(
+            new ActivityResultContracts.RequestPermission(), granted -> {
+                ReplyNotificationService.settings(this).edit().putBoolean("enabled", granted).apply();
+                syncNotifications();
+            });
 
     private final ActivityResultLauncher<Intent> chooser = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(), result -> {
                 if (upload == null) return;
-                upload.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(result.getResultCode(), result.getData()));
+                var files = new ActivityResultContracts.GetMultipleContents().parseResult(result.getResultCode(), result.getData());
+                ValueCallback<Uri[]> callback = upload;
                 upload = null;
+                callback.onReceiveValue(files.isEmpty() ? null : files.toArray(new Uri[0]));
             });
 
     @Override
     protected void onCreate(Bundle state) {
-        boolean pageDark = getPreferences(MODE_PRIVATE).getString("appearance", "dark").equals("dark");
-        darkMode = useDarkAppearance(pageDark);
+        appearanceMode = getPreferences(MODE_PRIVATE).getString("appearanceMode", "system");
+        darkMode = useDarkAppearance();
         setTheme(darkMode ? R.style.Theme_CodexRemote : R.style.Theme_CodexRemote_Light);
         super.onCreate(state);
+        ReplyNotificationService.createChannels(this);
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
 
         windowContent = new FrameLayout(this);
@@ -119,16 +173,13 @@ public final class MainActivity extends AppCompatActivity {
         LinearLayout toolbar = new LinearLayout(this);
         toolbar.setId(R.id.codex_toolbar);
         toolbar.setGravity(Gravity.CENTER_VERTICAL);
-        toolbar.setPadding(dp(20), 0, dp(8), 0);
-        root.addView(toolbar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(56)));
+        toolbar.setPadding(dp(16), 0, dp(8), 0);
+        root.addView(toolbar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)));
         toolbarTitle = new TextView(this);
         toolbarTitle.setText(R.string.toolbar_title);
-        toolbarTitle.setTextSize(20);
+        toolbarTitle.setTextSize(18);
         toolbarTitle.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         toolbar.addView(toolbarTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-        refreshButton = toolbarButton(R.id.codex_refresh, R.drawable.ic_refresh, R.string.refresh);
-        refreshButton.setOnClickListener(view -> reload());
-        toolbar.addView(refreshButton, new LinearLayout.LayoutParams(dp(48), dp(48)));
         moreButton = toolbarButton(R.id.codex_more, R.drawable.ic_more, R.string.more);
         moreButton.setOnClickListener(view -> showMenu());
         toolbar.addView(moreButton, new LinearLayout.LayoutParams(dp(48), dp(48)));
@@ -156,7 +207,11 @@ public final class MainActivity extends AppCompatActivity {
         createErrorPanel(content);
         content.addView(progress, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(2), Gravity.TOP));
         configureWebView();
-        applyAppearance(pageDark);
+        if (getPreferences(MODE_PRIVATE).getInt("webAssetsVersion", 0) != BuildConfig.VERSION_CODE) {
+            webView.clearCache(true);
+            getPreferences(MODE_PRIVATE).edit().putInt("webAssetsVersion", BuildConfig.VERSION_CODE).apply();
+        }
+        applyAppearance();
 
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
@@ -165,13 +220,30 @@ public final class MainActivity extends AppCompatActivity {
                 if (insets != null && insets.isVisible(WindowInsetsCompat.Type.ime())) {
                     WindowCompat.getInsetsController(getWindow(), windowContent).hide(WindowInsetsCompat.Type.ime());
                 } else if (fullscreenCallback != null) fullscreenCallback.onCustomViewHidden();
-                else if (webView.canGoBack()) webView.goBack();
-                else moveTaskToBack(true);
+                else if (webView.getUrl() != null && "/account/security".equals(Uri.parse(webView.getUrl()).getPath())) {
+                    webView.evaluateJavascript("(() => { const dialog = document.querySelector('dialog[open]'); if (!dialog) return false; dialog.dispatchEvent(new Event('cancel', {cancelable:true})); return true; })()",
+                            handled -> { if (!"true".equals(handled)) navigateBack(); });
+                } else navigateBack();
             }
         });
-        if (state != null) currentUrl = state.getString("currentUrl", BuildConfig.SERVER_URL);
+        if (state != null) {
+            currentUrl = state.getString("currentUrl", BuildConfig.SERVER_URL);
+            notificationThreadId = state.getString("notificationThreadId");
+            notificationCwd = state.getString("notificationCwd");
+        }
+        readNotificationIntent(getIntent());
+        if (notificationThreadId != null) currentUrl = notificationUrl();
         ViewCompat.requestApplyInsets(windowContent);
         if (installAppearanceObserver()) webView.loadUrl(currentUrl);
+    }
+
+    private void navigateBack() {
+        if (navigationReply != null && navigationCanGoBack) {
+            if (navigationPending) return;
+            navigationPending = true;
+            navigationReply.postMessage(navigationId);
+        } else if (webView.canGoBack()) webView.goBack();
+        else moveTaskToBack(true);
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -186,6 +258,9 @@ public final class MainActivity extends AppCompatActivity {
         settings.setLoadWithOverviewMode(true);
         settings.setTextZoom(100);
         settings.setSupportMultipleWindows(true);
+        if (Build.VERSION.SDK_INT >= 28 && WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+            passkeyBridge = new PasskeyBridge(this, webView);
+        }
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
         webView.setWebViewClient(new WebViewClient() {
@@ -201,6 +276,15 @@ public final class MainActivity extends AppCompatActivity {
             public void onPageStarted(WebView view, String url, android.graphics.Bitmap icon) {
                 if (fullscreenCallback != null) fullscreenCallback.onCustomViewHidden();
                 currentUrl = url;
+                appearanceReady = false;
+                notificationWorkspace = null;
+                notificationRequest = null;
+                navigationReply = null;
+                navigationId = null;
+                navigationCanGoBack = false;
+                navigationPending = false;
+                navigationOrigin = null;
+                cancelMicrophoneRequest();
                 loadFailed = false;
                 errorPanel.setVisibility(View.GONE);
                 webView.setVisibility(View.VISIBLE);
@@ -209,7 +293,13 @@ public final class MainActivity extends AppCompatActivity {
 
             @Override
             public void onPageFinished(WebView view, String url) {
+                notifyAppearance();
                 CookieManager.getInstance().flush();
+                if (sameServer(Uri.parse(url)) && Uri.parse(url).getPath().startsWith("/workbench")) {
+                    var notificationSettings = ReplyNotificationService.settings(MainActivity.this);
+                    if (!notificationSettings.getBoolean("asked", false)) enableNotifications();
+                    else syncNotifications();
+                }
                 progress.setVisibility(View.GONE);
                 view.evaluateJavascript("Boolean(window.CSS && CSS.supports('top', 'anchor(top)') && CSS.supports('width', 'anchor-size(width)'))", supported -> {
                     if (!"true".equals(supported)) showError(getString(R.string.webview_update), getString(R.string.webview_update_detail));
@@ -233,6 +323,27 @@ public final class MainActivity extends AppCompatActivity {
             }
         });
         webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public void onPermissionRequest(PermissionRequest request) {
+                String[] resources = request.getResources();
+                if (resources.length != 1 || !PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resources[0])
+                        || !microphoneOriginAllowed(request.getOrigin()) || microphoneRequest != null) {
+                    request.deny();
+                    return;
+                }
+                if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                    request.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
+                } else {
+                    microphoneRequest = request;
+                    microphonePermission.launch(Manifest.permission.RECORD_AUDIO);
+                }
+            }
+
+            @Override
+            public void onPermissionRequestCanceled(PermissionRequest request) {
+                if (microphoneRequest == request) microphoneRequest = null;
+            }
+
             @Override
             public void onShowCustomView(View view, CustomViewCallback callback) {
                 if (fullscreenContainer != null) throw new IllegalStateException("全屏页面已经打开。");
@@ -306,13 +417,61 @@ public final class MainActivity extends AppCompatActivity {
         Uri server = Uri.parse(BuildConfig.SERVER_URL);
         var origins = Collections.singleton(server.getScheme() + "://" + server.getAuthority());
         if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+            WebViewCompat.addWebMessageListener(webView, "CodexNavigation", Collections.singleton("https://*.vscode-cdn.net"),
+                    (view, message, origin, mainFrame, reply) -> {
+                        if (mainFrame) return;
+                        JsonObject data = JsonParser.parseString(message.getData()).getAsJsonObject();
+                        String id = data.get("id").getAsString();
+                        switch (data.get("type").getAsString()) {
+                            case "ready":
+                                navigationReply = reply;
+                                navigationOrigin = origin;
+                                navigationId = id;
+                                navigationCanGoBack = data.get("canGoBack").getAsBoolean();
+                                navigationPending = false;
+                                break;
+                            case "handled":
+                                if (id.equals(navigationId)) navigationPending = false;
+                                break;
+                            case "detached":
+                                if (id.equals(navigationId)) {
+                                    navigationReply = null;
+                                    navigationId = null;
+                                    navigationCanGoBack = false;
+                                    navigationPending = false;
+                                }
+                                break;
+                            default: throw new IllegalArgumentException("无法识别系统返回导航消息。");
+                        }
+                    });
             WebViewCompat.addWebMessageListener(webView, "CodexAppearance", origins,
                     (view, message, origin, mainFrame, reply) -> {
                         if (!mainFrame) return;
                         switch (message.getData()) {
-                            case "dark": applyAppearance(true); break;
-                            case "light": applyAppearance(false); break;
+                            case "ready": appearanceReady = true; notifyAppearance(); break;
+                            case "system": case "dark": case "light": requestAppearancePreference(message.getData()); break;
                             default: throw new IllegalArgumentException("无法识别网页的主题设置。");
+                        }
+                    });
+            WebViewCompat.addWebMessageListener(webView, "CodexNotifications", origins,
+                    (view, message, origin, mainFrame, reply) -> {
+                        if (!mainFrame) return;
+                        JsonObject data = JsonParser.parseString(message.getData()).getAsJsonObject();
+                        switch (data.get("type").getAsString()) {
+                            case "ready":
+                                notificationWorkspace = data.get("cwd").getAsString();
+                                openNotificationThread();
+                                break;
+                            case "opened":
+                                if (data.get("threadId").getAsString().equals(notificationThreadId)) {
+                                    notificationThreadId = null;
+                                    notificationCwd = null;
+                                    notificationRequest = null;
+                                    getIntent().removeExtra("notificationThreadId");
+                                    getIntent().removeExtra("notificationCwd");
+                                }
+                                break;
+                            default: throw new IllegalArgumentException("无法识别通知导航消息。");
                         }
                     });
         } else {
@@ -321,7 +480,8 @@ public final class MainActivity extends AppCompatActivity {
         }
         if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
             try (Scanner source = new Scanner(getResources().openRawResource(R.raw.appearance), "UTF-8")) {
-                WebViewCompat.addDocumentStartJavaScript(webView, source.useDelimiter("\\A").next(), origins);
+                appearanceSource = source.useDelimiter("\\A").next();
+                updateAppearanceScript();
             }
         } else {
             showError(getString(R.string.webview_update), getString(R.string.webview_update_detail));
@@ -330,13 +490,18 @@ public final class MainActivity extends AppCompatActivity {
         return true;
     }
 
-    private boolean useDarkAppearance(boolean pageDark) {
-        return pageDark || (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
-                == Configuration.UI_MODE_NIGHT_YES;
+    private boolean useDarkAppearance() {
+        switch (appearanceMode) {
+            case "dark": return true;
+            case "light": return false;
+            case "system": return (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
+                    == Configuration.UI_MODE_NIGHT_YES;
+            default: throw new IllegalArgumentException("无法识别保存的外观设置。");
+        }
     }
 
-    private void applyAppearance(boolean pageDark) {
-        boolean dark = useDarkAppearance(pageDark);
+    private void applyAppearance() {
+        boolean dark = useDarkAppearance();
         darkMode = dark;
         getTheme().applyStyle(dark ? R.style.Theme_CodexRemote : R.style.Theme_CodexRemote_Light, true);
         surface = getColor(dark ? R.color.surface_dark : R.color.surface_light);
@@ -350,7 +515,6 @@ public final class MainActivity extends AppCompatActivity {
         getWindow().getDecorView().setBackgroundColor(surface);
         webView.setBackgroundColor(surface);
         toolbarTitle.setTextColor(foreground);
-        tintButton(refreshButton);
         tintButton(moreButton);
         progress.setIndicatorColor(foreground);
         errorIcon.setImageTintList(ColorStateList.valueOf(secondary));
@@ -364,7 +528,62 @@ public final class MainActivity extends AppCompatActivity {
                 : SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT);
         EdgeToEdge.enable(this, bars, bars);
         tintMenu();
-        getPreferences(MODE_PRIVATE).edit().putString("appearance", pageDark ? "dark" : "light").apply();
+        updateAppearanceScript();
+        notifyAppearance();
+    }
+
+    private void setAppearancePreference(String preference) {
+        if (!List.of("system", "dark", "light").contains(preference)) {
+            throw new IllegalArgumentException("外观设置需要是 system、dark 或 light。");
+        }
+        appearanceMode = preference;
+        getPreferences(MODE_PRIVATE).edit().remove("appearance").putString("appearanceMode", preference).apply();
+        applyAppearance();
+    }
+
+    private void updateAppearanceScript() {
+        if (appearanceSource == null) return;
+        if (appearanceScript != null) appearanceScript.remove();
+        Uri server = Uri.parse(BuildConfig.SERVER_URL);
+        String initial = "window.codexNativeAppearanceInitial={preference:'" + appearanceMode
+                + "',theme:'" + (darkMode ? "dark" : "light") + "'};";
+        appearanceScript = WebViewCompat.addDocumentStartJavaScript(webView, initial + appearanceSource,
+                Collections.singleton(server.getScheme() + "://" + server.getAuthority()));
+    }
+
+    private void notifyAppearance() {
+        if (!appearanceReady || webView.getUrl() == null || !sameServer(Uri.parse(webView.getUrl()))) return;
+        webView.evaluateJavascript("window.codexApplyNativeAppearance('" + appearanceMode + "','"
+                + (darkMode ? "dark" : "light") + "')", null);
+    }
+
+    private void requestAppearancePreference(String preference) {
+        if (!List.of("system", "dark", "light").contains(preference)) {
+            throw new IllegalArgumentException("无法识别请求的外观设置。");
+        }
+        if (!appearanceMode.equals("system") || preference.equals("system")) {
+            setAppearancePreference(preference);
+            return;
+        }
+        if (appearanceDialog != null) return;
+        if (menu != null) menu.dismiss();
+        WindowCompat.getInsetsController(getWindow(), windowContent).hide(WindowInsetsCompat.Type.ime());
+        AlertDialog confirmation = new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.manual_appearance_title)
+                .setMessage(R.string.manual_appearance_detail)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.confirm, (dialog, selected) -> setAppearancePreference(preference))
+                .create();
+        appearanceDialog = confirmation;
+        requestedAppearance = preference;
+        confirmation.setOnDismissListener(dialog -> {
+            if (appearanceDialog == confirmation) {
+                appearanceDialog = null;
+                requestedAppearance = null;
+            }
+        });
+        confirmation.show();
+        tintDialogWindow(confirmation.getWindow());
     }
 
     private GradientDrawable rounded(int color, int radius) {
@@ -475,9 +694,47 @@ public final class MainActivity extends AppCompatActivity {
         menuIcons.add(close);
         heading.addView(close, new LinearLayout.LayoutParams(dp(48), dp(48)));
         body.addView(heading);
+        body.addView(menuRow(R.id.codex_refresh, R.drawable.ic_refresh, R.string.refresh, R.string.refresh_detail, () -> {
+            menu.dismiss();
+            reload();
+        }));
+        followSystemSwitch = new MaterialSwitch(this);
+        followSystemSwitch.setId(R.id.codex_follow_system);
+        followSystemSwitch.setContentDescription(getString(R.string.follow_system));
+        followSystemSwitch.setChecked(appearanceMode.equals("system"));
+        followSystemSwitch.setOnCheckedChangeListener((button, checked) ->
+                setAppearancePreference(checked ? "system" : darkMode ? "dark" : "light"));
+        LinearLayout appearanceRow = (LinearLayout) menuRow(R.id.codex_appearance, R.drawable.ic_appearance,
+                R.string.follow_system, R.string.follow_system_detail,
+                () -> followSystemSwitch.setChecked(!followSystemSwitch.isChecked()));
+        appearanceRow.addView(followSystemSwitch, new LinearLayout.LayoutParams(dp(52), dp(48)));
+        body.addView(appearanceRow);
+        notificationSwitch = new MaterialSwitch(this);
+        notificationSwitch.setId(R.id.codex_notification_switch);
+        notificationSwitch.setContentDescription(getString(R.string.reply_notifications));
+        notificationSwitch.setChecked(notificationsEnabled());
+        notificationSwitch.setOnCheckedChangeListener((button, checked) -> {
+            if (updatingNotificationSwitch) return;
+            if (checked) enableNotifications();
+            else {
+                ReplyNotificationService.settings(this).edit().putBoolean("enabled", false)
+                        .remove("since").remove("cursor").remove("delivered").apply();
+                syncNotifications();
+            }
+        });
+        LinearLayout notificationRow = (LinearLayout) menuRow(R.id.codex_notifications, R.drawable.ic_notification,
+                R.string.reply_notifications, R.string.reply_notifications_detail,
+                () -> notificationSwitch.setChecked(!notificationSwitch.isChecked()));
+        notificationRow.addView(notificationSwitch, new LinearLayout.LayoutParams(dp(52), dp(48)));
+        body.addView(notificationRow);
+        body.addView(menuRow(R.id.codex_notification_settings, R.drawable.ic_notification,
+                R.string.notification_settings, R.string.notification_settings_detail, () -> {
+                    menu.dismiss();
+                    openNotificationSettings();
+                }));
         body.addView(menuRow(R.id.codex_account, R.drawable.ic_account, R.string.account, R.string.account_detail, () -> {
             menu.dismiss();
-            webView.loadUrl(BuildConfig.SERVER_URL + "?manage=1");
+            webView.loadUrl(BuildConfig.SERVER_URL + "account");
         }));
         body.addView(menuRow(R.id.codex_browser, R.drawable.ic_external, R.string.browser, R.string.browser_detail, () -> {
             menu.dismiss();
@@ -494,6 +751,8 @@ public final class MainActivity extends AppCompatActivity {
         });
         menu.setOnDismissListener(dialog -> {
             menu = null;
+            followSystemSwitch = null;
+            notificationSwitch = null;
             menuLabels.clear();
             menuDetails.clear();
             menuIcons.clear();
@@ -542,11 +801,109 @@ public final class MainActivity extends AppCompatActivity {
         for (TextView label : menuLabels) label.setTextColor(foreground);
         for (TextView detail : menuDetails) detail.setTextColor(secondary);
         for (ImageView icon : menuIcons) icon.setImageTintList(ColorStateList.valueOf(foreground));
+        followSystemSwitch.setThumbTintList(new ColorStateList(new int[][] { { android.R.attr.state_checked }, {} }, new int[] { foreground, secondary }));
+        followSystemSwitch.setTrackTintList(new ColorStateList(new int[][] { { android.R.attr.state_checked }, {} }, new int[] { secondary, muted }));
+        notificationSwitch.setThumbTintList(followSystemSwitch.getThumbTintList());
+        notificationSwitch.setTrackTintList(followSystemSwitch.getTrackTintList());
+        tintDialogWindow(menu.getWindow());
+    }
+
+    @SuppressWarnings("deprecation")
+    private void tintDialogWindow(Window window) {
+        window.setStatusBarColor(Color.TRANSPARENT);
+        window.setNavigationBarColor(Color.TRANSPARENT);
+        if (Build.VERSION.SDK_INT >= 29) {
+            window.setStatusBarContrastEnforced(false);
+            window.setNavigationBarContrastEnforced(false);
+        }
+        var controller = WindowCompat.getInsetsController(window, window.getDecorView());
+        controller.setAppearanceLightStatusBars(!darkMode);
+        controller.setAppearanceLightNavigationBars(!darkMode);
     }
 
     private void reload() {
         if (loadFailed) webView.loadUrl(currentUrl);
         else webView.reload();
+    }
+
+    private void readNotificationIntent(Intent intent) {
+        String threadId = intent.getStringExtra("notificationThreadId");
+        if (threadId == null) return;
+        String cwd = intent.getStringExtra("notificationCwd");
+        if (!threadId.matches("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+                || cwd == null || !cwd.startsWith("/")) throw new IllegalArgumentException("通知中的会话信息无效。");
+        notificationThreadId = threadId;
+        notificationCwd = cwd;
+        notificationRequest = null;
+    }
+
+    private String notificationUrl() {
+        return Uri.parse(BuildConfig.SERVER_URL + "workbench/").buildUpon().appendQueryParameter("folder", notificationCwd).build().toString();
+    }
+
+    private void openNotificationThread() {
+        if (notificationThreadId == null) return;
+        if (!notificationCwd.equals(notificationWorkspace)) {
+            webView.loadUrl(notificationUrl());
+            return;
+        }
+        if (notificationThreadId.equals(notificationRequest)) return;
+        notificationRequest = notificationThreadId;
+        webView.evaluateJavascript("window.codexOpenNotificationThread(" + new JsonPrimitive(notificationThreadId) + ")", null);
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        readNotificationIntent(intent);
+        if (notificationThreadId != null) webView.loadUrl(notificationUrl());
+    }
+
+    private boolean notificationsEnabled() {
+        return ReplyNotificationService.settings(this).getBoolean("enabled", false)
+                && ReplyNotificationService.canNotify(this);
+    }
+
+    private void openNotificationSettings() {
+        startActivity(new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName())
+                .putExtra(Settings.EXTRA_CHANNEL_ID, ReplyNotificationService.REPLIES));
+    }
+
+    private void enableNotifications() {
+        var settings = ReplyNotificationService.settings(this);
+        boolean asked = settings.getBoolean("asked", false);
+        settings.edit().putBoolean("asked", true).apply();
+        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            if (!asked || shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) {
+                notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS);
+            } else {
+                settings.edit().putBoolean("enabled", true).apply();
+                startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName()));
+            }
+            return;
+        }
+        settings.edit().putBoolean("enabled", true).apply();
+        if (!getSystemService(NotificationManager.class).areNotificationsEnabled()) {
+            Toast.makeText(this, R.string.notification_permission, Toast.LENGTH_LONG).show();
+            startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName()));
+        } else if (!ReplyNotificationService.canNotify(this)) {
+            openNotificationSettings();
+        }
+        syncNotifications();
+    }
+
+    private void syncNotifications() {
+        boolean enabled = notificationsEnabled();
+        if (notificationSwitch != null) {
+            updatingNotificationSwitch = true;
+            notificationSwitch.setChecked(enabled);
+            updatingNotificationSwitch = false;
+        }
+        Intent service = new Intent(this, ReplyNotificationService.class);
+        if (enabled) ContextCompat.startForegroundService(this, service);
+        else stopService(service);
     }
 
     private void showError(String title, String detail) {
@@ -562,6 +919,19 @@ public final class MainActivity extends AppCompatActivity {
     private boolean sameServer(Uri uri) {
         Uri server = Uri.parse(BuildConfig.SERVER_URL);
         return "https".equals(uri.getScheme()) && server.getHost().equals(uri.getHost()) && server.getPort() == uri.getPort();
+    }
+
+    private boolean microphoneOriginAllowed(Uri origin) {
+        return webView.getUrl() != null && sameServer(Uri.parse(webView.getUrl()))
+                && Uri.parse(webView.getUrl()).getPath().startsWith("/workbench/")
+                && navigationOrigin != null && navigationOrigin.getScheme().equals(origin.getScheme())
+                && navigationOrigin.getAuthority().equals(origin.getAuthority());
+    }
+
+    private void cancelMicrophoneRequest() {
+        if (microphoneRequest == null) return;
+        microphoneRequest.deny();
+        microphoneRequest = null;
     }
 
     private void openExternal(Uri uri) {
@@ -580,6 +950,8 @@ public final class MainActivity extends AppCompatActivity {
     @Override
     protected void onSaveInstanceState(Bundle state) {
         state.putString("currentUrl", currentUrl);
+        state.putString("notificationThreadId", notificationThreadId);
+        state.putString("notificationCwd", notificationCwd);
         super.onSaveInstanceState(state);
     }
 
@@ -594,6 +966,7 @@ public final class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         if (webView != null) webView.onResume();
+        syncNotifications();
     }
 
     @Override
@@ -614,7 +987,22 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     @Override
+    public void onConfigurationChanged(Configuration configuration) {
+        super.onConfigurationChanged(configuration);
+        String pending = requestedAppearance;
+        if (appearanceDialog != null) appearanceDialog.dismiss();
+        appearanceDialog = null;
+        requestedAppearance = null;
+        applyAppearance();
+        if (pending != null) requestAppearancePreference(pending);
+    }
+
+    @Override
     protected void onDestroy() {
+        cancelMicrophoneRequest();
+        if (passkeyBridge != null) passkeyBridge.close();
+        if (appearanceDialog != null) appearanceDialog.dismiss();
+        if (appearanceScript != null) appearanceScript.remove();
         if (fullscreenCallback != null) fullscreenCallback.onCustomViewHidden();
         hideFullscreen();
         if (menu != null) {

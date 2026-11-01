@@ -1,6 +1,6 @@
 # Codex Web Community
 
-在手机或电脑浏览器中使用自己服务器上的 Codex。项目提供 HTTPS 密码入口、官方 VS Code 网页工作台和常驻 Codex 引擎，支持对话、权限审批、命令执行、文件编辑与会话历史。
+在手机或电脑浏览器中使用自己服务器上的 Codex。项目提供 HTTPS 登录、官方 VS Code 网页工作台和常驻 Codex 引擎，支持对话、权限审批、命令执行、文件编辑、会话历史、账户设置、通行密钥、任务通知和语音输入。可以安装 Claude Code、GitHub Copilot 和 Qoder CN，在同一个工作台中切换助手。
 
 每套部署供同一个系统用户使用。掌握网站密码的人可以使用该用户的 Codex 和项目文件。多人共同使用时，应当为每个人提供独立的系统用户或容器、项目目录及登录状态。
 
@@ -13,7 +13,7 @@
 
 通过 `npm install -g @openai/codex` 安装 Codex CLI。安装脚本使用当前 PATH 中的 `codex`，也可以通过 `--codex` 指定可执行文件的绝对路径。
 
-运行所需官方组件由安装脚本获取：VS Code Server **1.143.1** 和 Codex 插件 **26.51007.21434**。官方组件保持原有程序内容，分别遵守其许可证。本项目的 MIT 许可证适用于仓库中的项目代码。
+运行所需官方组件由安装脚本获取：VS Code Server **1.143.1** 和 Codex 插件 **26.51007.21434**。安装程序应用仓库内的组件补丁，提供主题、手机布局、附件选择、录音和系统返回支持，并检查组件版本。官方组件分别遵守其许可证。本项目的 MIT 许可证适用于仓库中的项目代码。
 
 ## 安装
 
@@ -63,7 +63,7 @@ npm run setup -- --project "$HOME/projects/my-project" --host 0.0.0.0 --hostname
 
 ## 配置
 
-安装结果写入 `config.json`，其中保存项目目录、可执行文件、运行目录、监听地址、端口和证书路径。该文件与 `.artifacts/` 已加入 Git 忽略规则。
+安装结果写入 `config.json`，其中保存项目目录、可执行文件、运行目录、监听地址、端口和证书路径。该文件与 `.artifacts/` 已加入 Git 忽略规则。网站首次启动会将密码哈希迁移到 `.artifacts/account.sqlite`，保留已有密码；后续运行 setup 会保留这个账户。
 
 | 参数 | 默认值 | 用途 |
 | --- | --- | --- |
@@ -77,12 +77,51 @@ npm run setup -- --project "$HOME/projects/my-project" --host 0.0.0.0 --hostname
 | `--workbench-port` | `8444` | 内部工作台端口 |
 | `--engine-port` | `8446` | 内部 Codex 引擎端口 |
 | `--tls-cert` / `--tls-key` | 自动生成 | HTTPS 证书与私钥，需要成对提供 |
+| `--claude` | 关闭 | 安装 Claude Code 2.1.314 |
+| `--copilot` | 关闭 | 安装 GitHub Copilot Chat |
+| `--qoder` | 关闭 | 安装 Qoder CN 2.6.10 |
 
 三个端口需要互不相同，端口占用会让启动过程立即终止。工作台与引擎仅监听 `127.0.0.1`，并校验各自的连接令牌。
 
 重复执行安装时使用相同参数，密码、令牌、证书、配置与会话会保留。安装参数与已有配置不同时，安装程序会终止并提示检查 `config.json`。修改配置后重新启动服务。搬移安装目录时，需要更新配置中的绝对路径和 `.artifacts/workbench/data/Machine/settings.json` 中的 `chatgpt.cliExecutable`。
 
 需要代理时，在运行安装、登录、启动命令的终端中设置 `HTTP_PROXY`、`HTTPS_PROXY` 和 `NO_PROXY=localhost,127.0.0.1`。后台服务可通过仓库根目录的 `.env` 文件设置环境变量。代理由部署者按自己的网络环境配置。
+
+## 账户设置
+
+工作台标题栏的账户入口与 Android 更多菜单均可打开账户设置。在“登录与安全”中可以修改访问密码、配置 SMTP、绑定恢复邮箱和管理通行密钥。新密码至少需要十五个字符，修改密码后全部设备需要重新登录。恢复邮箱需要点击验证邮件确认，更换已绑定邮箱时需要依次确认旧邮箱和新邮箱。
+
+邮件服务支持 SMTP 465 和 587，验证服务器连接后保存配置，授权凭证使用本地密钥加密。网站地址填写手机实际访问的固定 HTTPS origin，例如 `https://codex.example.com:8443`。密码重置链接十五分钟内有效，并且只能使用一次。
+
+也可以在 `.env` 中设置 `SMTP_HOST`、`SMTP_PORT`、`SMTP_USER`、`SMTP_PASS`、`SMTP_FROM` 与 `CODEX_PUBLIC_ORIGIN`。通过网页保存的邮件配置优先使用。服务器本机可以运行以下交互命令：
+
+```bash
+npm run password:reset
+npm run recovery:email
+```
+
+通行密钥需要固定域名、受信任的 HTTPS 证书和 Android 签名证书指纹。在 `.env` 中设置：
+
+```dotenv
+CODEX_PASSKEY_RP_ID=codex.example.com
+CODEX_PASSKEY_APP_ORIGIN=https://codex.example.com:8443
+CODEX_PASSKEY_WEB_ORIGIN=https://codex.example.com:8443
+CODEX_ANDROID_CERTIFICATE_SHA256=自己的Android签名证书SHA256指纹
+```
+
+指纹使用冒号分隔的 32 个十六进制字节，可以通过 `keytool -list -v -keystore 自己的签名文件` 查看。Android 构建时设置相同的 `-PcodexPasskeyRpId=codex.example.com`。网站提供 `/.well-known/assetlinks.json`，域名的 HTTPS 默认端口需要能够公开访问该文件，关联的应用 ID 为 `dev.stdlibstring.codexremote.community`。未配置通行密钥时，网站使用访问密码登录。
+
+## 语音与多个助手
+
+安装 uv 后，执行以下命令。安装程序使用独立的 Python 3.12 环境：
+
+```bash
+npm run voice:setup
+```
+
+命令在 `.artifacts/voice-venv` 安装固定版本的 faster-whisper、PyAV 和 OpenCC，并下载固定版本的 Whisper large-v3-turbo 模型到 `.artifacts/voice-model`。语音通过当前登录的 HTTPS 网站上传，在服务器 CPU 上使用 int8 转写，中文结果转换为简体。单次录音最多两分钟、16 MiB。网页需要授予麦克风权限，Android APP 通过系统权限管理录音。
+
+安装多个助手时，在相同 setup 命令中加入 `--claude --copilot --qoder`。每个助手分别完成自己的账户登录和模型配置。侧栏标签支持触摸拖动排序，主题支持跟随系统及手动切换，后台标签保留页面、草稿和会话。设置与确认窗口适应手机宽度。工作台凭据通过当前登录会话取得的独立加密密钥保存。
 
 ## 后台运行
 
@@ -107,7 +146,7 @@ systemctl --user stop codex-web-community
 
 ## Android APP
 
-`android/` 提供版本 `1.1.2` 的 Codex 远程 APP 源码，包含明暗主题、原生菜单、系统文件选择、软键盘布局和 WebView 全屏支持。服务器地址、公开证书和签名通过构建参数配置。应用 ID 为 `dev.stdlibstring.codexremote.community`，支持 Android 8.0 及以上版本。
+`android/` 提供版本 `1.7.2` 的 Codex APP 源码，包含系统明暗主题、原生菜单、系统附件选择、软键盘布局、WebView 全屏、通行密钥和后台任务通知。服务器地址、公开证书和签名通过构建参数配置。应用 ID 为 `dev.stdlibstring.codexremote.community`，支持 Android 8.0 及以上版本。
 
 准备 JDK 21 与 Android SDK 36 后，在仓库根目录构建自己的安装包：
 
@@ -116,6 +155,10 @@ npm run android:build -- assembleDebug lintDebug -PcodexServerUrl=https://codex.
 ```
 
 安装包位于 `android/app/build/outputs/apk/debug/app-debug.apk`。使用系统已信任证书时省略 `codexServerCa`。正式签名、构建环境与参数说明见 [Android APP](android/README.md)。
+
+在 APP 更多菜单中启用任务通知，并授予系统通知权限。后台服务接收回复完成、等待批准和等待回答的通知；可直接回答的问题提供通知回复操作，发送失败时保留答案并提供重试。点击通知进入对应会话。
+
+需要通过登录页面提供自己的正式安装包时，将签名 APK 保存到 `.artifacts/android-download/codex-remote.apk`，并在同一目录生成 `codex-remote.apk.sha256`。该安装包应使用自己部署的服务器地址和证书。
 
 ## 验证
 

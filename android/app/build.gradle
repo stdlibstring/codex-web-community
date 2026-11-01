@@ -15,6 +15,8 @@ if (!'https'.equalsIgnoreCase(server.scheme) || !server.host || server.rawUserIn
 }
 def serverHost = server.host.toLowerCase(Locale.ROOT)
 def serverUrl = new URI('https', null, serverHost, server.port == 443 ? -1 : server.port, '/', null, null).toASCIIString()
+def passkeyRpId = providers.gradleProperty('codexPasskeyRpId').getOrElse(serverHost)
+if (!(passkeyRpId ==~ /[a-z0-9][a-z0-9.-]*/)) throw new GradleException('codexPasskeyRpId 必须是小写域名。')
 def caPath = providers.gradleProperty('codexServerCa').orNull
 def caFile = caPath ? rootProject.file(caPath) : null
 if (caFile != null && !caFile.isFile()) throw new GradleException('codexServerCa 指定的公开证书文件不存在。')
@@ -38,10 +40,12 @@ android {
         applicationId 'dev.stdlibstring.codexremote.community'
         minSdk 26
         targetSdk 36
-        versionCode 5
-        versionName '1.1.3'
+        versionCode 26
+        versionName '1.7.2'
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
         buildConfigField 'String', 'SERVER_URL', JsonOutput.toJson(serverUrl)
+        buildConfigField 'String', 'PASSKEY_RP_ID', JsonOutput.toJson(passkeyRpId)
+        resValue 'string', 'asset_statements', JsonOutput.toJson([[include: "https://${passkeyRpId}/.well-known/assetlinks.json"]]).replace('"', '\\"')
     }
 
     signingConfigs {
@@ -133,9 +137,15 @@ dependencies {
     androidTestImplementation 'androidx.test:core:1.7.0'
     androidTestImplementation 'androidx.test:runner:1.7.0'
     androidTestImplementation 'androidx.test.ext:junit:1.3.0'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.7.0'
     implementation 'androidx.activity:activity:1.10.1'
     implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'androidx.core:core:1.16.0'
     implementation 'androidx.webkit:webkit:1.14.0'
+    implementation 'androidx.credentials:credentials:1.6.0'
+    implementation 'androidx.credentials:credentials-play-services-auth:1.6.0'
+    implementation 'com.google.android.gms:play-services-fido:21.3.1'
     implementation 'com.google.android.material:material:1.13.0'
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'com.google.code.gson:gson:2.13.2'
 }

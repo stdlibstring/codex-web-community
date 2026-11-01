@@ -11,5 +11,5 @@
     "outDir": "dist/server",
     "rootDir": "."
   },
-  "include": ["server/gateway.ts", "shared/config.mjs"]
+  "include": ["server/gateway.ts", "server/account-cli.ts", "shared/config.mjs", "shared/question-history.mjs"]
 }

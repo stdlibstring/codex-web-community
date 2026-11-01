@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { access, stat, readFile } from 'node:fs/promises';
+import { access, stat, readFile, readdir } from 'node:fs/promises';
 import { X509Certificate, createPrivateKey } from 'node:crypto';
 import { constants } from 'node:fs';
 import { resolve } from 'node:path';
@@ -9,7 +9,10 @@ const config = await loadConfig();
 await access(config.codex, constants.X_OK);
 await access(config.server, constants.X_OK);
 await access(config.project, constants.R_OK | constants.W_OK | constants.X_OK);
-for (const path of ['session.key', 'auth.json', 'access.json', 'engine.token', 'workbench.token']) {
+const files = await readdir(state);
+if (!files.includes('account.sqlite') && !files.includes('auth.json')) throw new Error('账户尚未初始化。');
+for (const path of ['session.key', 'engine.token', 'workbench.token', 'workbench-secret.key',
+  ...['auth.json', 'access.json', 'account.sqlite', 'account.key'].filter(name => files.includes(name))]) {
   const info = await stat(resolve(state, path));
   if (info.mode & 0o077) throw new Error(`${path} 需要仅允许当前用户读取。`);
 }

@@ -16,3 +16,4 @@ config.json
 *.keystore
 keystore.properties
 signing.properties
+__pycache__/

@@ -1,0 +1,6 @@
+--- a/webview/assets/header-4afcdefd370e.js
++++ b/webview/assets/header-4afcdefd370e.js
+@@ -2,1 +2,3 @@
++import { withNativeNavigation } from './codex-web-navigation.js?v=1';
++Fn = withNativeNavigation(Fn, { useEffect: (...args) => Mn.useEffect(...args), useLocation: () => p(), goBack: () => Ln() });
+ //# sourceMappingURL=header-4afcdefd370e.js.map

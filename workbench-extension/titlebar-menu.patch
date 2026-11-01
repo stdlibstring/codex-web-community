@@ -1,0 +1,14 @@
+--- a/out/vs/code/browser/workbench/workbench.js
++++ b/out/vs/code/browser/workbench/workbench.js
+@@ -5771,1 +5771,3 @@
++import { installWorkbenchControls } from './codex-web-controls.js?v=20';
++installWorkbenchControls(qe, em, elt, re, { registry: De, ids: F, expression: D, extensionServiceId: Mt, urlServiceId: VS, layoutServiceId: oo, auxiliaryBarPart: uB, uri: A, webviewElement: Iye, overlayWebview: mdt, resizableElement: BO, splitView: Ah, settingsEditor: xu }, vt);
+ //# sourceMappingURL=https://main.vscode-cdn.net/sourcemaps/e646868227c3e3a9e3f24277c8c7220be42c0be7/core/vs/code/browser/workbench/workbench.js.map
+--- a/out/vs/code/browser/workbench/workbench.html
++++ b/out/vs/code/browser/workbench/workbench.html
+@@ -17,1 +17,1 @@
+-		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
++		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
+@@ -99,1 +99,1 @@
+-	<script type="module" src="{{WORKBENCH_WEB_BASE_URL}}/out/vs/code/browser/workbench/workbench.js"></script>
++	<script type="module" src="{{WORKBENCH_WEB_BASE_URL}}/out/vs/code/browser/workbench/workbench.js?codex-web=controls-20"></script>
